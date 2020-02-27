@@ -2,6 +2,9 @@
 //
 
 /*
+Alejandro Miguel Sánchez Mora
+A01272385
+
 Use the multithreading version of the algorithm to get an approximation to constant PI that we complete class.
 Apply now two threads (two different routines), remove the CRITICAL SECTION and protect the global accumulator with an EVENT.
 */
