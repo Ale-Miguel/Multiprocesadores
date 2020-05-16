@@ -1,3 +1,0 @@
-﻿  MainOpenMPExample.cpp
-c1xx : error C2338: no se admite la búsqueda de nombres en dos fases para OpenMP, C++/CLI o C++/CX. Use /Zc:twoPhase-
-c1xx : fatal error C1903: no se puede recuperar de errores anteriores; se detiene la compilación
