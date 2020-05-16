@@ -1,0 +1,8 @@
+﻿  TaskDecompOMP.cpp
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(46,12): warning C4244: '=': conversión de 'int' a 'float'; posible pérdida de datos
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(47,12): warning C4244: '=': conversión de 'int' a 'float'; posible pérdida de datos
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(42): warning C4101: 'E': variable local sin referencia
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(42): warning C4101: 'F': variable local sin referencia
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(42): warning C4101: 'C': variable local sin referencia
+C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\TaskDecompOMP.cpp(42): warning C4101: 'D': variable local sin referencia
+  TaskDecompotitionOMP.vcxproj -> C:\Users\ale_j\Documents\Multiprocesadores\Programas\TaskDecompotitionOMP\Debug\TaskDecompotitionOMP.exe

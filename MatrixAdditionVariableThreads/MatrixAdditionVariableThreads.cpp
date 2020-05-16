@@ -25,6 +25,7 @@ int* C = NULL;
 
 DWORD WINAPI sumar(LPVOID inicio) {
 
+	printf("Starting threadvi\n");
 
 	int* inicioSuma = (int*)inicio;
 	int limite = *inicioSuma + (dimension / max_threads) + (dimension % max_threads);
@@ -51,8 +52,11 @@ int main() {
 	HANDLE* threadsArray;
 	int* startsIn;
 
-	printf("How many threads do you want to use?\n");
-	scanf_s("%d", &max_threads);
+	do {
+		printf("How many threads do you want to use (at least 1)?\n");
+		scanf_s("%d", &max_threads);
+	} while (max_threads < 1);
+	
 
 	threadsArray = (HANDLE*)malloc(sizeof(HANDLE) * max_threads);
 	startsIn = (int*)malloc(sizeof(int) * max_threads);

@@ -1,0 +1,7 @@
+﻿  Source.cpp
+  --- Analizando función: main
+  C:\Users\ale_j\Documents\Multiprocesadores\Programas\AutoVectorización\Source.cpp(34) : info C5002: bucle no vectorizado por el siguiente motivo: '500'
+  C:\Users\ale_j\Documents\Multiprocesadores\Programas\AutoVectorización\Source.cpp(22) : info C5001: bucle vectorizado
+  C:\Users\ale_j\Documents\Multiprocesadores\Programas\AutoVectorización\Source.cpp(29) : info C5001: bucle vectorizado
+  C:\Users\ale_j\Documents\Multiprocesadores\Programas\AutoVectorización\Source.cpp(42) : info C5002: bucle no vectorizado por el siguiente motivo: '1200'
+  AutoVectorización.vcxproj -> C:\Users\ale_j\Documents\Multiprocesadores\Programas\AutoVectorización\Debug\AutoVectorización.exe

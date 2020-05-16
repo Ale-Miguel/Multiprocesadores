@@ -64,10 +64,8 @@ DWORD WINAPI calcularPrimeraParte(LPVOID inicio) {
 
 DWORD WINAPI calcularSegundaParte(LPVOID inicio) {
 
-    //Se espera a que el evento sea activado para empezar la ejecución de la función
-    WaitForSingleObject(threadEvent, INFINITE);
 
-    cout << "Empezando segunda parte" << endl;
+    
 
     long double* param = (long double*)inicio;
 
@@ -88,7 +86,9 @@ DWORD WINAPI calcularSegundaParte(LPVOID inicio) {
         x += baseIntervalo;
     }
 
-
+    //Se espera a que el evento sea activado para ejecutar la suma del resultado final
+    WaitForSingleObject(threadEvent, INFINITE);
+    cout << "Sumando en segunda parte" << endl;
     resultado += acum;
 
     cout << "Termina segunda parte" << endl;
