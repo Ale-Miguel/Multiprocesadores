@@ -51,6 +51,12 @@ int main(void) {
 	//Memory copy Host to Device of the result
 	cudaMemcpy(h_y, d_y, size, cudaMemcpyDeviceToHost);
 
+	cudaError_t error = cudaGetLastError();
+	if (error != cudaSuccess) {
+		//Print the CUDA error message
+		printf("CUDA error: %s\n", cudaGetErrorString(error));
+	}
+
 	//Print array
 	//for (int i = 0; i < N; i++)
 	//printf("%d: %f\n", 
