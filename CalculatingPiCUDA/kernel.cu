@@ -1,3 +1,10 @@
+/*
+Alejandro Miguel Sánchez Mora
+A01272385
+
+Jessica Tovar Saucedo
+A00818101
+*/
 #include <stdio.h>
 #include <iostream>
 #include <time.h>
@@ -5,7 +12,7 @@
 using namespace std;
 
 #define MAX_ITERATIONS_PER_THREAD 100000    //Cantidad óptima de iteraciones que corre cada thread (máximo es 500000)
-#define MAX_THREADS_PER_BLOCK 1024
+#define MAX_THREADS_PER_BLOCK 1024          //Cantidad máxima de threads que se ejecutan por bloque (máximo 1024)
 #define NUMBER_OF_INTERVALS 1000000000
 
 
@@ -14,7 +21,7 @@ __global__ void calcular(double* resultados) {
     int threadNumber = threadIdx.x;
     int blockNumber = blockIdx.x;
 
-    //Variable que guarda el número de thread respecto a 0 - CantidadDeThreads (sin importar en qué bloque está)
+    //Variable que guarda el número de thread respecto a 0 - CantidadTotalDeThreads (sin importar en qué bloque está)
     int trueThreadNumber = MAX_THREADS_PER_BLOCK * blockNumber + threadNumber;
 
     //Se verifica si este thread se debe de ejecutar, por si la división de intervalos / iteraciones no es exacta
@@ -23,7 +30,7 @@ __global__ void calcular(double* resultados) {
         return;
     }
 
-    double acum = 1;
+    double acum = 0;
     double baseIntervalo = 1.0 / NUMBER_OF_INTERVALS;
     
     //Mitades de rectángulos
@@ -43,7 +50,6 @@ __global__ void calcular(double* resultados) {
     acum *= baseIntervalo;
 
     resultados[trueThreadNumber] = acum;
-   
 }
 
 int main() {
@@ -98,12 +104,14 @@ int main() {
         resultado += h_resultados[i];
     }
 
-    printf("Result = %20.18lf (%ld)\n", resultado, endT - start);
+    printf("Result using CUDA = %20.18lf (%ld)\n", resultado, endT - start);
 
     free(h_resultados);
+
     cudaFree(d_resultados);
 
 }
+
 /*
 //Código secuencial
 #include <stdio.h>
@@ -127,7 +135,7 @@ void main() {
    }
    acum *= baseIntervalo;
    end = clock();
+
    printf("Result = %20.18lf (%ld)\n", acum, end - start);
 }
-
 */
