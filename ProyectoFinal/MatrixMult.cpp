@@ -38,25 +38,51 @@ Validaciones:
 
 using namespace std;
 
-#define INPUT_FILE_NAME "test.txt"
+#define MATRIX_A_FILE_NAME "test.txt"
+#define MATRIX_B_FILE_NAME "test.txt"
+#define MATRIX_C_FILE_NAME "test.txt"
 
-double matrixA;
-double matrixB;
-double matrixC;
+double **matrixA;
+double **matrixB;
+double **matrixC;
 
-int columnsA;
-
+int columnsA, rowsA;
+int columnsB, rowsB;
+int columnsC, rowsC;
 
 
 int main() {
 
-	ifstream inputFile(INPUT_FILE_NAME);
+	ifstream matrixAFile(MATRIX_A_FILE_NAME);	//Archivo de matriz A
+	ifstream matrixBFile(MATRIX_B_FILE_NAME);	//Archivo de matriz B
 
-	//Se verifica que el archivo se pudo abrir
-	if (!inputFile.is_open()) {
+	ofstream matrixCFile(MATRIX_C_FILE_NAME);	//Archivo de matriz resultante C
+
+	//Se verifica que los archivos se puedan abrir
+	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFile.is_open()) {
 		cout << "ERROR: Could not open file" << endl;
 		return 0;
 	}
+
+	cout << "Cantidad de filas de Matriz A: ";
+	cin >> rowsA;
+
+	cout << "Cantidad de columnas de Matriz A: ";
+	cin >> columnsA;
+
+	cout << "Cantidad de filas de Matriz B: ";
+	cin >> rowsB;
+
+	cout << "Cantidad de columnas de Matriz B: ";
+	cin >> columnsB;
+
+	//Se valida que la multiplicación se pueda hacer
+	if (rowsA != columnsB) {
+		cout << "ERROR: can't do the matrix multiplications (rows_matrix_A != columns_matrix_B)" << endl;
+		return 0;
+	}
+
+
 
 
 	
