@@ -35,6 +35,7 @@ Validaciones:
 #include <omp.h>
 #include <iostream>
 #include <fstream>
+#include <intrin.h>
 
 using namespace std;
 
@@ -42,10 +43,15 @@ using namespace std;
 #define MATRIX_B_FILE_NAME "matrixB.txt"
 #define MATRIX_C_FILE_NAME "matrixC.txt"
 
+#define NUMBERS_PER_REGISTER 8
+
 double **matrixA;
 double **matrixB;
 double **matrixCseq;		//Apuntador que guarda la matriz resultante del código secuencial
-double **matrixCparalel;	//Apuntador que guarda la matriz resultante del código en paralelo
+double **matrixCparallel1;	//Apuntador que guarda la matriz resultante del código en paralelo
+double** matrixCparallel2;	//Apuntador que guarda la matriz resultante del código en paralelo
+
+double** matrixT;
 
 int columnsA, rowsA;
 int columnsB, rowsB;
@@ -70,6 +76,7 @@ void sequentialCode(double**& matrix) {
 		if (!matrix[i]) {
 			sendErrorMessage("No se pudo asignar memoria para matriz C en código secuencial");
 		}
+
 		for (int j = 0; j < columnsC; j++) {
 			matrix[i][j] = 0;
 		}
@@ -84,9 +91,83 @@ void sequentialCode(double**& matrix) {
 	}
 }
 
-//Función para llenar las matices cuya información se obtiene de un archivo
+void transpose(double**& matrixOrigin, double**& matrixTarget , int rows, int columns) {
+	matrixTarget = (double**)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double*));
+	if (!matrixTarget) {
+		sendErrorMessage("No se pudo asignar memoria para matriz Aux en código secuencial");
+	}
+
+	for (int i = 0; i < columns; i++) {
+		matrixTarget[i] = (double*)malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double));
+
+		if (!matrixTarget[i]) {
+			sendErrorMessage("No se pudo asignar memoria para matriz Aux en código secuencial");
+		}
+
+		for (int j = 0; j < rows; j++) {
+			matrixTarget[i][j] = matrixOrigin[j][i];
+		}
+
+		for (int j = 0; j < rows % NUMBERS_PER_REGISTER; j++) {
+			matrixTarget[i][j + rows] = 0;
+		}
+	}
+
+	for (int i = 0; i < columns % NUMBERS_PER_REGISTER; i++) {
+		matrixTarget[i + columns] = (double*)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double));
+
+		if (!matrixTarget[i]) {
+			sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
+		}
+
+		for (int j = 0; j < rows + rows % NUMBERS_PER_REGISTER; j++) {
+			matrixTarget[i + columns][j] = 0;
+		}
+	}
+}
+
+void intrinsicsCode(double**& matrix) {
+	matrix = (double**)malloc(rowsC * sizeof(double*));
+	if (!matrix) {
+		sendErrorMessage("No se pudo asignar memoria para matriz C en código secuencial");
+	}
+
+	for (int i = 0; i < rowsC; i++) {
+		matrix[i] = (double*)malloc(columnsC * sizeof(double));
+
+		if (!matrix[i]) {
+			sendErrorMessage("No se pudo asignar memoria para matriz C en código secuencial");
+		}
+		for (int j = 0; j < columnsC; j++) {
+			matrix[i][j] = 0;
+		}
+	}
+	__m256d a, b, r, r2;
+
+	double* resultado = (double*)malloc(sizeof(double) * 4);
+
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			for (int k = 0; k <  rowsB / 4  + 1; k++) {
+				a = _mm256_loadu_pd(matrixA[i] + k * 4);
+				b = _mm256_loadu_pd(matrixT[j] + k * 4);
+
+				r = _mm256_mul_pd(a, b);
+				r2 = _mm256_hadd_pd(r, r);
+
+				_mm256_storeu_pd(resultado, r2);
+
+				matrix[i][j] += resultado[0] + resultado[2];
+
+				//matrix[i][j] += matrixA[i][k] * matrixT[j][k];
+			}
+		}
+	}
+}
+
+//Función para llenar las matrices cuya información se obtiene de un archivo
 void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
-	matrix = (double**)malloc(rows * sizeof(double*));
+	matrix = (double**)malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double*));
 
 	if (!matrix) {
 		sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
@@ -96,7 +177,7 @@ void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
 
 	for (int i = 0; i < rows; i++) {
 
-		matrix[i] = (double*)malloc(columns * sizeof(double));
+		matrix[i] = (double*)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double));
 
 		if (!matrix[i]) {
 			sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
@@ -111,7 +192,24 @@ void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
 				sendErrorMessage("Elementos en archivo no suficientes para llenar la matriz");
 			}
 		}
+
+		for (int j = 0; j < columns % NUMBERS_PER_REGISTER; j++) {
+			matrix[i][j + columns] = 0;
+		}
 	}
+
+	for (int i = 0; i < rows % NUMBERS_PER_REGISTER; i++) {
+		matrix[i + rows] = (double*)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double));
+
+		if (!matrix[i]) {
+			sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
+		}
+
+		for (int j = 0; j < columns + columns % NUMBERS_PER_REGISTER; j++) {
+			matrix[i + rows][j] = 0;
+		}
+	}
+	
 }
 
 
@@ -121,7 +219,7 @@ int main() {
 	ifstream matrixBFile(MATRIX_B_FILE_NAME);	//Archivo de matriz B
 
 	ofstream matrixCFile(MATRIX_C_FILE_NAME);	//Archivo de matriz resultante C
-
+	
 	//Se verifica que los archivos se puedan abrir
 	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFile.is_open()) {
 		sendErrorMessage("No se pudo abrir el archivo");
@@ -150,8 +248,6 @@ int main() {
 	fillMatrix(matrixA, matrixAFile, rowsA, columnsA);
 	fillMatrix(matrixB, matrixBFile, rowsB, columnsB);
 
-	sequentialCode(matrixCseq);
-
 	cout << "Matrix A" << endl;
 	for (int i = 0; i < rowsA; i++) {
 		for (int j = 0; j < columnsA; j++) {
@@ -170,10 +266,42 @@ int main() {
 		cout << endl;
 	}
 
+
+
+	transpose(matrixB, matrixT, rowsB, columnsB);
+	cout << "Matrix B transpose sequential" << endl;
+	if (!matrixT) {
+		sendErrorMessage("NOPE");
+	}
+	for (int i = 0; i < columnsB; i++) {
+		for (int j = 0; j < rowsB; j++) {
+			cout << matrixT[i][j] << "\t";
+		}
+
+		cout << endl;
+	}
+
+	sequentialCode(matrixCseq);
+
 	cout << "Matrix C sequential" << endl;
 	for (int i = 0; i < rowsC; i++) {
 		for (int j = 0; j < columnsC; j++) {
 			cout << matrixCseq[i][j] << "\t";
+		}
+
+		cout << endl;
+	}
+
+	intrinsicsCode(matrixCparallel1);
+
+	cout << "Matrix C intrinsics" << endl;
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			cout << matrixCparallel1[i][j] << "\t";
+			
+			if (matrixCparallel1[i][j] != matrixCseq[i][j]) {
+				sendErrorMessage("Resultados de intrinsicas y secuencial no son iguales");
+			}
 		}
 
 		cout << endl;
@@ -186,6 +314,8 @@ int main() {
 	free(matrixA);
 	free(matrixB);
 	free(matrixCseq);
-	
+	free(matrixCparallel1);
+	free(matrixT);
+
 	return 0;
 }
