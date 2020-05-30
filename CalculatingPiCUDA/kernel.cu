@@ -47,7 +47,7 @@ __global__ void calcular(double* resultados) {
 
     }
 
-    acum *= baseIntervalo;
+    //acum *= baseIntervalo;
 
     resultados[trueThreadNumber] = acum;
 }
@@ -103,6 +103,8 @@ int main() {
 
         resultado += h_resultados[i];
     }
+
+    resultado *= (1.0 / NUMBER_OF_INTERVALS);
 
     printf("Result using CUDA = %20.18lf (%ld)\n", resultado, endT - start);
 
