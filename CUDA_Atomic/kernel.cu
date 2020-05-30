@@ -7,7 +7,7 @@ A00818101
 */
 #include <stdio.h>
 
-#define STEPS 2000000000
+#define STEPS 100000000
 #define BLOCKS 100
 #define THREADS 100
 
@@ -16,6 +16,7 @@ float pi = 0;
 
 // Kernel
 __global__ void pi_calculation(float* sum, int nsteps, double base, int nthreads, int nblocks) {
+
 	int i;
 	double x;
 	float acum = 0;
@@ -24,15 +25,12 @@ __global__ void pi_calculation(float* sum, int nsteps, double base, int nthreads
 		x = (i + 0.5) * base;
 		acum += 4.0 / (1.0 + x * x); //Save result to device memory
 	}
-	acum *= base;
 	
 	//Este atomicAdd usa floats en vez de doubles porque la computadora donde se hizo la tarea
 	//tiene CUDA Compute Cabability 5.0 (GTX 850M) y la suma con doubles solo es soportado a partir
-	//del Compute Capability 6.X y mayor.
+	//del Compute Capability 6.X y posterior.
 	
 	atomicAdd(&sum[0], acum);
-
-	printf("ATOMIC %0.10f\n", acum); 
 }
 
 int main(void) {
@@ -55,16 +53,18 @@ int main(void) {
 
 	// Sync
 	cudaDeviceSynchronize();
-	endT = clock();
+
 	// Copy results from device to host
 	cudaMemcpy(h_sum, d_sum, size, cudaMemcpyDeviceToHost);
 
 	
-	pi = *h_sum;
+	pi = *h_sum * base;
+
+	endT = clock();
 
 	//Se pierde presición en la aproximación de pi porque se están utilizando floats en vez de doubles
-		// Output Results
-	printf("PI = %.10f (%d)\n", h_sum[0], endT - start);
+	// Output Results
+	printf("PI = %.10f (%d)\n", pi, endT - start);
 
 	// Cleanup
 	free(h_sum);
@@ -76,7 +76,7 @@ int main(void) {
 //CÓDIGO ORIGINAL
 /*#include <stdio.h>
 
-#define STEPS 2000000000
+#define STEPS 100000000
 #define BLOCKS 100
 #define THREADS 100
 
@@ -87,16 +87,11 @@ double pi = 0;
 __global__ void pi_calculation(double* sum, int nsteps, double base, int nthreads, int nblocks) {
 	int i;
 	double x;
-	double acum = 0;
 	int idx = blockIdx.x * blockDim.x + threadIdx.x; // Calculate index for each thread
 	for (i = idx; i < nsteps; i += nthreads * nblocks) {
 		x = (i + 0.5) * base;
-		acum += 4.0 / (1.0 + x * x); //Save result to device memory
+		sum[idx] += 4.0 / (1.0 + x * x); //Save result to device memory
 	}
-	acum *= base;
-	sum[idx] = acum;
-
-	printf("ASDFDA %0.10f\n", acum);
 }
 
 int main(void) {
@@ -112,30 +107,24 @@ int main(void) {
 	cudaMalloc((void**)&d_sum, size); // Allocate array on device
 	// Initialize array in device to 0
 	cudaMemset(d_sum, 0, size);
-
-	for (int i = 0; i < BLOCKS * THREADS; i++) {
-		h_sum[i] = 0;
-	}
+	
 	start = clock();
 	// Launch Kernel
 	pi_calculation << <dimGrid, dimBlock >> > (d_sum, STEPS, base, THREADS, BLOCKS);
 
 	// Sync
 	cudaDeviceSynchronize();
-	endT = clock();
+	
 	// Copy results from device to host
 	cudaMemcpy(h_sum, d_sum, size, cudaMemcpyDeviceToHost);
 
 	// Do the final reduction.
-	for (threadidx = 0; threadidx < THREADS * BLOCKS; threadidx++) {
+	for (threadidx = 0; threadidx < THREADS * BLOCKS; threadidx++)
 		pi += h_sum[threadidx];
-		//printf("%.10f\n", h_sum[threadidx]);
-	}
-		
 
 	// Multiply by base
-	//pi *= base;
-
+	pi *= base;
+	endT = clock();
 	// Output Results
 	printf("PI = %.10f (%d)\n", pi, endT - start);
 
@@ -144,4 +133,6 @@ int main(void) {
 	cudaFree(d_sum);
 
 	return 0;
-}*/
+}
+
+*/
