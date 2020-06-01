@@ -7,7 +7,8 @@ A00818101
 */
 #include <stdio.h>
 
-#define STEPS 100000000
+#define STEPS 2000000000 
+//#define STEPS 100000000 // STEPS para la GTX 850M
 #define BLOCKS 100
 #define THREADS 100
 

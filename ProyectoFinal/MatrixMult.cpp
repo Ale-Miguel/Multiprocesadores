@@ -314,19 +314,12 @@ int main() {
 	ofstream matrixCFilep1(MATRIX_C_FILE_NAME_P1);	//Archivo de matriz resultante C
 	ofstream matrixCFilep2(MATRIX_C_FILE_NAME_P2);	//Archivo de matriz resultante C
 	ofstream matrixCFileSeq(MATRIX_C_FILE_NAME_SEQ);	//Archivo de matriz resultante C
-
-	/*matrixCFilep1.open(MATRIX_C_FILE_NAME_P1, fstream::in | fstream:: out);
-	matrixCFilep2.open(MATRIX_C_FILE_NAME_P2, fstream::in | fstream::out);
-	matrixCFileSeq.open(MATRIX_C_FILE_NAME_SEQ, fstream::in | fstream::out);*/
 	
 	//Se verifica que los archivos se puedan abrir
-	/*if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFilep1.is_open() || !matrixCFilep2.is_open() || !matrixCFileSeq.is_open()) {
+	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFilep1.is_open() || !matrixCFilep2.is_open() || !matrixCFileSeq.is_open()) {
 		sendErrorMessage("No se pudo abrir el archivo");
-	}*/
+	}
 
-	/*if ( !matrixCFileSeq.is_open()) {
-		sendErrorMessage("No se pudo abrir el archivo");
-	}*/
 
 	cout << "Cantidad de filas de Matriz A: ";
 	cin >> rowsA;
@@ -351,25 +344,6 @@ int main() {
 	fillMatrix(matrixA, matrixAFile, rowsA, columnsA);
 	fillMatrix(matrixB, matrixBFile, rowsB, columnsB);
 
-	cout << "Matrix A" << endl;
-	/*for (int i = 0; i < rowsA; i++) {
-		for (int j = 0; j < columnsA; j++) {
-			cout << matrixA[i][j] << "\t";
-		}
-
-		cout << endl;
-	}*/
-
-	cout << "Matrix B" << endl;
-	/*for (int i = 0; i < rowsB; i++) {
-		for (int j = 0; j < columnsB; j++) {
-			cout << matrixB[i][j] << "\t";
-		}
-
-		cout << endl;
-	}*/
-
-
 	transpose(matrixB, matrixT, rowsB, columnsB);
 
 	cout << "Matrix B transpose sequential" << endl;
@@ -378,27 +352,12 @@ int main() {
 		sendErrorMessage("NOPE");
 	}
 
-	/*for (int i = 0; i < columnsB; i++) {
-		for (int j = 0; j < rowsB; j++) {
-			cout << matrixT[i][j] << "\t";
-		}
-
-		cout << endl;
-	}*/
-
 	sequentialCode(matrixCseq);
 
 	saveMatrix(matrixCseq, matrixCFileSeq, rowsC, columnsC);
 
 
 	cout << "Matrix C sequential" << endl;
-	/*for (int i = 0; i < rowsC; i++) {
-		for (int j = 0; j < columnsC; j++) {
-			cout << matrixCseq[i][j] << "\t";
-		}
-
-		cout << endl;
-	}*/
 
 	intrinsicsCode(matrixCparallel1);
 	saveMatrix(matrixCparallel1, matrixCFilep1, rowsC, columnsC);
@@ -410,26 +369,7 @@ int main() {
 
 	validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P2);
 	
-	/*for (int i = 0; i < rowsC; i++) {
-		for (int j = 0; j < columnsC; j++) {
-			//cout << matrixCparallel2[i][j] << "\t";
-
-			if (matrixCparallel2[i][j] != matrixCseq[i][j]) {
-				sendErrorMessage("Resultados de OMPintrisnicas y secuencial no son iguales");
-			}
-		}
-
-		//cout << endl;
-	}*/
-
-	/*for (int i = 0; i < rowsC * columnsC; i++) {
-		matrixCFilep2 >> lineParallel;
-		matrixCFileSeq >> lineSeq;
-
-		if (lineParallel != lineSeq) {
-			sendErrorMessage("Resultados de OMPintrisnicas y secuencial no son iguales");
-		}
-	}*/
+	
 
 	matrixAFile.close();
 	matrixBFile.close();
