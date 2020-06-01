@@ -48,6 +48,7 @@ using namespace std;
 
 #define NUMBERS_PER_REGISTER 8
 #define NUMBER_OF_RUNS 5
+#define ITEMS_PER_REGISTER 2
 
 double **matrixA;
 double **matrixB;
@@ -63,7 +64,7 @@ int columnsC, rowsC;
 
 long tSequential[NUMBER_OF_RUNS];
 long tIntrinsics[NUMBER_OF_RUNS];
-long tOmpIntrinsics[NUMBER_OF_RUNS];
+long tOmp[NUMBER_OF_RUNS];
 
 time_t start, endT;
 
@@ -73,13 +74,29 @@ void sendErrorMessage(string message) {
 	exit(0);
 }
 void createResultMatrix(double**& matrix) {
+
+	if (matrix) {
+		for (int i = 0; i < rowsC; i++) {
+			for (int j = 0; j < columnsC; j++) {
+				matrix[i][j] = 0;
+			}
+		}
+
+		return;
+	}
+
 	matrix = (double**)malloc(rowsC * sizeof(double*));
+
+
 	if (!matrix) {
 		sendErrorMessage("No se pudo asignar memoria para matriz C ");
 	}
 
 	for (int i = 0; i < rowsC; i++) {
+
+
 		matrix[i] = (double*)malloc(columnsC * sizeof(double));
+
 
 		if (!matrix[i]) {
 			sendErrorMessage("No se pudo asignar memoria para matriz C");
@@ -89,12 +106,16 @@ void createResultMatrix(double**& matrix) {
 			matrix[i][j] = 0;
 		}
 	}
+
+	
 }
 void sequentialCode(double**& matrix) {
 
-	createResultMatrix(matrix);
+	
 
 	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
+
+		createResultMatrix(matrix);
 
 		start = clock();
 
@@ -153,31 +174,29 @@ void transpose(double**& matrixOrigin, double**& matrixTarget , int rows, int co
 
 void intrinsicsCode(double**& matrix) {
 	
-	__m256d a, b, r, r2;
+	__m128d a, b, r;
 
-	createResultMatrix(matrix);
+	
 
-	double* resultado = (double*)malloc(sizeof(double) * 4);
+	double* resultado = (double*)malloc(sizeof(double) * ITEMS_PER_REGISTER);
 
 	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
 
+		createResultMatrix(matrix);
+
 		start = clock();
-#pragma omp parallel for 
+
 		for (int i = 0; i < rowsC; i++) {
 			for (int j = 0; j < columnsC; j++) {
-				//for (int k = 0; k < rowsB / 4 + 1; k++) {
-				for (int k = 0; k < rowsB; k++) {
-					/*a = _mm256_loadu_pd(matrixA[i] + k * 4);
-					b = _mm256_loadu_pd(matrixT[j] + k * 4);
+				for (int k = 0; k < rowsB / ITEMS_PER_REGISTER + rowsB % ITEMS_PER_REGISTER; k++) {
+					a = _mm_loadu_pd(matrixA[i] + k * ITEMS_PER_REGISTER);
+					b = _mm_loadu_pd(matrixT[j] + k * ITEMS_PER_REGISTER);
 
-					r = _mm256_mul_pd(a, b);
-					r2 = _mm256_hadd_pd(r, r);
+					r = _mm_dp_pd(a, b, 255);
 
-					_mm256_storeu_pd(resultado, r2);
+					_mm_storeu_pd(resultado, r);
 
-					matrix[i][j] += resultado[0] + resultado[2];*/
-
-					matrix[i][j] += matrixA[i][k] * matrixT[j][k];
+					matrix[i][j] += resultado[0];
 				}
 			}
 		}
@@ -192,45 +211,35 @@ void intrinsicsCode(double**& matrix) {
 
 void openMPCode(double**& matrix) {
 
-	__m256d a, b, r, r2;
-
-	createResultMatrix(matrix);
-
-	double* resultado = (double*)malloc(sizeof(double) * 4);
+	
 
 	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
 
+		createResultMatrix(matrix);
+
 		start = clock();
-#pragma omp parallel for 
+
+		#pragma omp parallel for
 		for (int i = 0; i < rowsC; i++) {
 			for (int j = 0; j < columnsC; j++) {
-				for (int k = 0; k < rowsB / 4 + 1; k++) {
-					a = _mm256_loadu_pd(matrixA[i] + k * 4);
-					b = _mm256_loadu_pd(matrixT[j] + k * 4);
-
-					r = _mm256_mul_pd(a, b);
-					r2 = _mm256_hadd_pd(r, r);
-
-					_mm256_storeu_pd(resultado, r2);
-
-					matrix[i][j] += resultado[0] + resultado[2];
-
-					//matrix[i][j] += matrixA[i][k] * matrixT[j][k];
+				for (int k = 0; k < rowsB; k++) {
+					matrix[i][j] += matrixA[i][k] * matrixB[k][j];
 				}
 			}
 		}
 
 		endT = clock();
 
-		tOmpIntrinsics[run] = endT - start;
+		tOmp[run] = endT - start;
 
-		printf("OMP Intrin time %d = %d\n", run, tOmpIntrinsics[run]);
+		printf("OMP time %d = %d\n", run, tOmp[run]);
 	}
 }
 
 
 //Función para llenar las matrices cuya información se obtiene de un archivo
 void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
+
 	matrix = (double**)malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double*));
 
 	if (!matrix) {
@@ -292,18 +301,36 @@ void validateMatrix(string matrixFileSeq, string matrixFileP) {
 
 	double seq, par;
 
-	for (int i = 0; i < rowsC * columnsC; i++) {
-		seqFile >> seq;
-		parFile >> par;
+	for (int i = 0; i < rowsC ; i++) {
+		for (int j = 0; j <  columnsC; j++) {
+			seqFile >> seq;
+			parFile >> par;
 
-		//cout << seq << "\t" << par << endl;
-		if (seq != par) {
-			sendErrorMessage("Resultados distintos de secuencial con paralelo");
+			//cout << seq << "\t" << par << endl;
+			if (seq != par) {
+				printf("Seq: %.10f Par: %.10f at [%d][%d]\n", seq, par, i, j);
+				sendErrorMessage("Resultados distintos de secuencial con paralelo");
+			}
 		}
 	}
 
 	seqFile.close();
 	parFile.close();
+}
+
+void validateMatrix(double**& matrixSeq, double**& matrixPar) {
+
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			
+			if (matrixSeq[i][j] != matrixPar[i][j]) {
+				printf("Seq: %.10f Par: %.10f at [%d][%d]\n", matrixSeq[i][j], matrixPar[i][j], i, j);
+				sendErrorMessage("Resultados distintos de secuencial con paralelo");
+			}
+		}
+	}
+
+	
 }
 
 int main() {
@@ -314,7 +341,11 @@ int main() {
 	ofstream matrixCFilep1(MATRIX_C_FILE_NAME_P1);	//Archivo de matriz resultante C
 	ofstream matrixCFilep2(MATRIX_C_FILE_NAME_P2);	//Archivo de matriz resultante C
 	ofstream matrixCFileSeq(MATRIX_C_FILE_NAME_SEQ);	//Archivo de matriz resultante C
-	
+
+	double seqAvg = 0;
+	double intrinAvg = 0;
+	double OMPAvg = 0;
+
 	//Se verifica que los archivos se puedan abrir
 	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFilep1.is_open() || !matrixCFilep2.is_open() || !matrixCFileSeq.is_open()) {
 		sendErrorMessage("No se pudo abrir el archivo");
@@ -337,7 +368,7 @@ int main() {
 	if (rowsA != columnsB) {
 		sendErrorMessage("No se puede hacer la multiplicacion de matrices");
 	}
-	
+
 	rowsC = rowsA;
 	columnsC = columnsB;
 
@@ -346,30 +377,48 @@ int main() {
 
 	transpose(matrixB, matrixT, rowsB, columnsB);
 
-	cout << "Matrix B transpose sequential" << endl;
 
 	if (!matrixT) {
-		sendErrorMessage("NOPE");
+		sendErrorMessage("No se pudo crear la matriz transpuesta");
 	}
 
+
+
+		
 	sequentialCode(matrixCseq);
-
 	saveMatrix(matrixCseq, matrixCFileSeq, rowsC, columnsC);
-
-
-	cout << "Matrix C sequential" << endl;
 
 	intrinsicsCode(matrixCparallel1);
 	saveMatrix(matrixCparallel1, matrixCFilep1, rowsC, columnsC);
 
-	validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P1);
+	//validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P1);
+	validateMatrix(matrixCseq, matrixCparallel1);
 
 	openMPCode(matrixCparallel2);
 	saveMatrix(matrixCseq, matrixCFilep2, rowsC, columnsC);
 
-	validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P2);
-	
-	
+	//validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P2);
+	validateMatrix(matrixCseq, matrixCparallel2);
+
+	printf("Corrida\t\tSerial\t\tParalelo 1\tParalelo 2\n");
+
+	for (int i = 0; i < NUMBER_OF_RUNS; i++) {
+		printf("%d\t\t%ld\t\t%ld\t\t%ld\n", i + 1, tSequential[i], tIntrinsics[i], tOmp[i]);
+		seqAvg += tSequential[i];
+		intrinAvg += tIntrinsics[i];
+		OMPAvg += tOmp[i];
+	}
+
+	seqAvg /= NUMBER_OF_RUNS;
+	intrinAvg /= NUMBER_OF_RUNS;
+	OMPAvg /= NUMBER_OF_RUNS;
+
+	printf("Promedio\t%lf\t%lf\t%lf\n", seqAvg, intrinAvg, OMPAvg);
+
+	double intrinImpv = intrinAvg / seqAvg;
+	double ompImp = OMPAvg / seqAvg;
+
+	printf("%% vs Serial\t-\t\t%lf\t%lf\n", intrinImpv, ompImp);
 
 	matrixAFile.close();
 	matrixBFile.close();
@@ -382,6 +431,23 @@ int main() {
 	free(matrixCseq);
 	free(matrixCparallel1);
 	free(matrixT);
-
+	
 	return 0;
 }
+
+/*for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			printf("%0.10f\t", matrixCseq[i][j]);
+		}
+
+		printf("\n");
+	}
+
+	printf("OMP\n");
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			printf("%0.10f\t", matrixCparallel1[i][j]);
+		}
+
+		printf("\n");
+	}*/
