@@ -40,13 +40,11 @@ Validaciones:
 
 using namespace std;
 
-#define MATRIX_A_FILE_NAME "matrixA.txt"
-#define MATRIX_B_FILE_NAME "matrixB.txt"
-#define MATRIX_C_FILE_NAME_P1 "matrixCp1.txt"
-#define MATRIX_C_FILE_NAME_P2 "matrixCp2.txt"
-#define MATRIX_C_FILE_NAME_SEQ "matrixCSeq.txt"
+#define MATRIX_A_FILE_NAME "matrizA.txt"
+#define MATRIX_B_FILE_NAME "matrizB.txt"
+#define MATRIX_C_FILE_NAME_SEQ "matrizC.txt"
 
-#define NUMBERS_PER_REGISTER 8
+#define NUMBERS_PER_REGISTER 2
 #define NUMBER_OF_RUNS 5
 #define ITEMS_PER_REGISTER 2
 
@@ -73,19 +71,15 @@ void sendErrorMessage(string message) {
 	cout << "ERROR: " << message << endl;
 	exit(0);
 }
+
+//Función que crea la matriz resultante de la multiplicación de matrices 
 void createResultMatrix(double**& matrix) {
 
 	if (matrix) {
-		for (int i = 0; i < rowsC; i++) {
-			for (int j = 0; j < columnsC; j++) {
-				matrix[i][j] = 0;
-			}
-		}
-
 		return;
 	}
 
-	matrix = (double**)malloc(rowsC * sizeof(double*));
+	matrix = (double**)_aligned_malloc(rowsC * sizeof(double*), 16);
 
 
 	if (!matrix) {
@@ -95,7 +89,7 @@ void createResultMatrix(double**& matrix) {
 	for (int i = 0; i < rowsC; i++) {
 
 
-		matrix[i] = (double*)malloc(columnsC * sizeof(double));
+		matrix[i] = (double*)_aligned_malloc(columnsC * sizeof(double), 16);
 
 
 		if (!matrix[i]) {
@@ -109,18 +103,20 @@ void createResultMatrix(double**& matrix) {
 
 	
 }
-void sequentialCode(double**& matrix) {
+void sequentialCode(double**& matrix, int run) {
+
+	createResultMatrix(matrix);
 
 	
 
-	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
-
-		createResultMatrix(matrix);
 
 		start = clock();
 
 		for (int i = 0; i < rowsC; i++) {
 			for (int j = 0; j < columnsC; j++) {
+
+				matrix[i][j] = 0;
+
 				for (int k = 0; k < rowsB; k++) {
 					matrix[i][j] += matrixA[i][k] * matrixB[k][j];
 				}
@@ -131,19 +127,22 @@ void sequentialCode(double**& matrix) {
 
 		tSequential[run] = endT - start;
 
-		printf("Seq time %d = %d\n", run, tSequential[run]);
-	}
+		//printf("Seq time %d = %d\n", run, tSequential[run]);
+	
 	
 }
 
+//Función que genera una matriz transpuesta
 void transpose(double**& matrixOrigin, double**& matrixTarget , int rows, int columns) {
-	matrixTarget = (double**)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double*));
+
+	matrixTarget = (double**)_aligned_malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double*), 16);
+
 	if (!matrixTarget) {
-		sendErrorMessage("No se pudo asignar memoria para matriz Aux en código secuencial");
+		sendErrorMessage("No se pudo asignar memoria para matriz transpuesta");
 	}
 
 	for (int i = 0; i < columns; i++) {
-		matrixTarget[i] = (double*)malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double));
+		matrixTarget[i] = (double*)_aligned_malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double), 16);
 
 		if (!matrixTarget[i]) {
 			sendErrorMessage("No se pudo asignar memoria para matriz Aux en código secuencial");
@@ -172,75 +171,73 @@ void transpose(double**& matrixOrigin, double**& matrixTarget , int rows, int co
 	}
 }
 
-void intrinsicsCode(double**& matrix) {
+void intrinsicsCode(double**& matrix, int run) {
 	
 	__m128d a, b, r;
 
-	
+	createResultMatrix(matrix);
 
 	double* resultado = (double*)malloc(sizeof(double) * ITEMS_PER_REGISTER);
+		
+	start = clock();
 
-	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
+			matrix[i][j] = 0;
+			for (int k = 0; k < rowsB / ITEMS_PER_REGISTER + rowsB % ITEMS_PER_REGISTER; k++) {
+				a = _mm_load_pd(matrixA[i] + k * ITEMS_PER_REGISTER);
+				b = _mm_load_pd(matrixT[j] + k * ITEMS_PER_REGISTER);
 
-		createResultMatrix(matrix);
+				r = _mm_dp_pd(a, b, 255);
 
-		start = clock();
+				_mm_store_pd(resultado, r);
 
-		for (int i = 0; i < rowsC; i++) {
-			for (int j = 0; j < columnsC; j++) {
-				for (int k = 0; k < rowsB / ITEMS_PER_REGISTER + rowsB % ITEMS_PER_REGISTER; k++) {
-					a = _mm_loadu_pd(matrixA[i] + k * ITEMS_PER_REGISTER);
-					b = _mm_loadu_pd(matrixT[j] + k * ITEMS_PER_REGISTER);
+				matrix[i][j] += resultado[0];
 
-					r = _mm_dp_pd(a, b, 255);
-
-					_mm_storeu_pd(resultado, r);
-
-					matrix[i][j] += resultado[0];
-				}
+				//matrix[i][j] += matrixA[i[][k] * matrixB[k][j];
 			}
 		}
-
-		endT = clock();
-
-		tIntrinsics[run] = endT - start;
-
-		printf("Intrin time %d = %d\n", run, tIntrinsics[run]);
 	}
+
+	endT = clock();
+
+	tIntrinsics[run] = endT - start;
+
+	//printf("Intrin time %d = %d\n", run, tIntrinsics[run]);
+	
 }
 
-void openMPCode(double**& matrix) {
+void openMPCode(double**& matrix, int run) {
 
-	
+	createResultMatrix(matrix);
 
-	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
+	start = clock();
 
-		createResultMatrix(matrix);
+	#pragma omp parallel for
+	for (int i = 0; i < rowsC; i++) {
+		for (int j = 0; j < columnsC; j++) {
 
-		start = clock();
+			matrix[i][j] = 0;
 
-		#pragma omp parallel for
-		for (int i = 0; i < rowsC; i++) {
-			for (int j = 0; j < columnsC; j++) {
-				for (int k = 0; k < rowsB; k++) {
-					matrix[i][j] += matrixA[i][k] * matrixB[k][j];
-				}
+			for (int k = 0; k < rowsB; k++) {
+				matrix[i][j] += matrixA[i][k] * matrixB[k][j];
 			}
 		}
-
-		endT = clock();
-
-		tOmp[run] = endT - start;
-
-		printf("OMP time %d = %d\n", run, tOmp[run]);
 	}
+
+	endT = clock();
+
+	tOmp[run] = endT - start;
+
+	//printf("OMP time %d = %d\n", run, tOmp[run]);
+	
 }
 
 
 //Función para llenar las matrices cuya información se obtiene de un archivo
 void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
 
-	matrix = (double**)malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double*));
+	matrix = (double**)_aligned_malloc((rows + rows % NUMBERS_PER_REGISTER) * sizeof(double*), 16);
 
 	if (!matrix) {
 		sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
@@ -250,7 +247,7 @@ void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
 
 	for (int i = 0; i < rows; i++) {
 
-		matrix[i] = (double*)malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double));
+		matrix[i] = (double*)_aligned_malloc((columns + columns % NUMBERS_PER_REGISTER) * sizeof(double), 16);
 
 		if (!matrix[i]) {
 			sendErrorMessage("No se pudo asignar la memoria suficiente para la matriz");
@@ -285,6 +282,7 @@ void fillMatrix(double** &matrix, ifstream &matrixFile, int rows, int columns) {
 	
 }
 
+//Función que guarda la matriz resultante en un archivo
 void saveMatrix(double**& matrix, ofstream& matrixFile, int rows, int columns) {
 	double line;
 	for (int i = 0; i < rows; i++) {
@@ -295,42 +293,31 @@ void saveMatrix(double**& matrix, ofstream& matrixFile, int rows, int columns) {
 	}
 }
 
-void validateMatrix(string matrixFileSeq, string matrixFileP) {
-	ifstream seqFile(matrixFileSeq);
-	ifstream parFile(matrixFileP);
+//Función que checa si los valores de dos matrices son iguales con 10 decimales de precisión
+void validateMatrix(double**& matrixSeq, double**& matrixPar, string codeName) {
 
-	double seq, par;
-
-	for (int i = 0; i < rowsC ; i++) {
-		for (int j = 0; j <  columnsC; j++) {
-			seqFile >> seq;
-			parFile >> par;
-
-			//cout << seq << "\t" << par << endl;
-			if (seq != par) {
-				printf("Seq: %.10f Par: %.10f at [%d][%d]\n", seq, par, i, j);
-				sendErrorMessage("Resultados distintos de secuencial con paralelo");
-			}
-		}
-	}
-
-	seqFile.close();
-	parFile.close();
-}
-
-void validateMatrix(double**& matrixSeq, double**& matrixPar) {
+	cout << "Validando resultados de codigo secuencial contra " << codeName << endl;
 
 	for (int i = 0; i < rowsC; i++) {
 		for (int j = 0; j < columnsC; j++) {
 			
-			if (matrixSeq[i][j] != matrixPar[i][j]) {
-				printf("Seq: %.10f Par: %.10f at [%d][%d]\n", matrixSeq[i][j], matrixPar[i][j], i, j);
-				sendErrorMessage("Resultados distintos de secuencial con paralelo");
+			//Para saber si los números son iguales en sus primeros 10 decimales, 
+			//Se hace una resta 
+			double difference = matrixSeq[i][j] - matrixPar[i][j];
+
+			//Se saca el valor absoluto
+			if (difference < 0)
+				difference *= -1;
+
+			//Si la diferencia es mayor a los 10 decimales, entonces el resultado es incorrecto
+			if (difference > 0.0000000001) {
+				printf("Seq: %.10f Par: %.10f at [%d][%d] Difference = %0.20f\n", matrixSeq[i][j], matrixPar[i][j], i, j, difference);
+				sendErrorMessage("Resultados distintos de secuencial con " + codeName);
 			}
 		}
 	}
 
-	
+	cout << "Los resultados coinciden" << endl;
 }
 
 int main() {
@@ -338,8 +325,6 @@ int main() {
 	ifstream matrixAFile(MATRIX_A_FILE_NAME);	//Archivo de matriz A
 	ifstream matrixBFile(MATRIX_B_FILE_NAME);	//Archivo de matriz B
 
-	ofstream matrixCFilep1(MATRIX_C_FILE_NAME_P1);	//Archivo de matriz resultante C
-	ofstream matrixCFilep2(MATRIX_C_FILE_NAME_P2);	//Archivo de matriz resultante C
 	ofstream matrixCFileSeq(MATRIX_C_FILE_NAME_SEQ);	//Archivo de matriz resultante C
 
 	double seqAvg = 0;
@@ -347,7 +332,7 @@ int main() {
 	double OMPAvg = 0;
 
 	//Se verifica que los archivos se puedan abrir
-	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFilep1.is_open() || !matrixCFilep2.is_open() || !matrixCFileSeq.is_open()) {
+	if (!matrixAFile.is_open() || !matrixBFile.is_open() || !matrixCFileSeq.is_open()) {
 		sendErrorMessage("No se pudo abrir el archivo");
 	}
 
@@ -365,7 +350,7 @@ int main() {
 	cin >> columnsB;
 
 	//Se valida que la multiplicación se pueda hacer
-	if (rowsA != columnsB) {
+	if (columnsA != rowsB) {
 		sendErrorMessage("No se puede hacer la multiplicacion de matrices");
 	}
 
@@ -382,33 +367,26 @@ int main() {
 		sendErrorMessage("No se pudo crear la matriz transpuesta");
 	}
 
+	printf("Corrida\t\tSerial\t\tIntrinsecas\tOpenMP\n");
 
+	for (int run = 0; run < NUMBER_OF_RUNS; run++) {
 
-		
-	sequentialCode(matrixCseq);
-	saveMatrix(matrixCseq, matrixCFileSeq, rowsC, columnsC);
+		printf("%d", run + 1);
 
-	intrinsicsCode(matrixCparallel1);
-	saveMatrix(matrixCparallel1, matrixCFilep1, rowsC, columnsC);
+		sequentialCode(matrixCseq, run);
+		printf("\t\t%ld", tSequential[run]);
 
-	//validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P1);
-	validateMatrix(matrixCseq, matrixCparallel1);
+		intrinsicsCode(matrixCparallel1, run);
+		printf("\t\t%ld", tIntrinsics[run]);
 
-	openMPCode(matrixCparallel2);
-	saveMatrix(matrixCseq, matrixCFilep2, rowsC, columnsC);
+		openMPCode(matrixCparallel2, run);
+		printf("\t\t%ld\n", tOmp[run]);
 
-	//validateMatrix(MATRIX_C_FILE_NAME_SEQ, MATRIX_C_FILE_NAME_P2);
-	validateMatrix(matrixCseq, matrixCparallel2);
-
-	printf("Corrida\t\tSerial\t\tParalelo 1\tParalelo 2\n");
-
-	for (int i = 0; i < NUMBER_OF_RUNS; i++) {
-		printf("%d\t\t%ld\t\t%ld\t\t%ld\n", i + 1, tSequential[i], tIntrinsics[i], tOmp[i]);
-		seqAvg += tSequential[i];
-		intrinAvg += tIntrinsics[i];
-		OMPAvg += tOmp[i];
+		seqAvg += tSequential[run];
+		intrinAvg += tIntrinsics[run];
+		OMPAvg += tOmp[run];
 	}
-
+	
 	seqAvg /= NUMBER_OF_RUNS;
 	intrinAvg /= NUMBER_OF_RUNS;
 	OMPAvg /= NUMBER_OF_RUNS;
@@ -420,34 +398,37 @@ int main() {
 
 	printf("%% vs Serial\t-\t\t%lf\t%lf\n", intrinImpv, ompImp);
 
+	cout << "El codigo ";
+
+	if (OMPAvg <= intrinAvg && OMPAvg <= seqAvg) {
+		cout << "de OMP";
+	}
+	else if (intrinAvg <= OMPAvg && intrinAvg <= seqAvg) {
+		cout << "de INTRINSECAS";
+	}
+	else {
+		cout << "SECUENCIAL";
+	}
+
+	cout << " fue el mas rapido en hacer la multiplicacion de matrices" << endl;
+
+	saveMatrix(matrixCseq, matrixCFileSeq, rowsC, columnsC);
+
+	//Se valida que el resultado del código de intrínsecas sea igual que el resultado del código secuencial
+	validateMatrix(matrixCseq, matrixCparallel1, "intrinsecas");
+
+	//Se valida que el resultado del código de Open MP sea igual que el resultado del código secuencial
+	validateMatrix(matrixCseq, matrixCparallel2, "OMP");
+	
 	matrixAFile.close();
 	matrixBFile.close();
 	matrixCFileSeq.close();
-	matrixCFilep1.close();
-	matrixCFilep2.close();
 
-	free(matrixA);
-	free(matrixB);
-	free(matrixCseq);
-	free(matrixCparallel1);
-	free(matrixT);
+	_aligned_free(matrixA);
+	_aligned_free(matrixB);
+	_aligned_free(matrixCseq);
+	_aligned_free(matrixCparallel1);
+	_aligned_free(matrixT);
 	
 	return 0;
 }
-
-/*for (int i = 0; i < rowsC; i++) {
-		for (int j = 0; j < columnsC; j++) {
-			printf("%0.10f\t", matrixCseq[i][j]);
-		}
-
-		printf("\n");
-	}
-
-	printf("OMP\n");
-	for (int i = 0; i < rowsC; i++) {
-		for (int j = 0; j < columnsC; j++) {
-			printf("%0.10f\t", matrixCparallel1[i][j]);
-		}
-
-		printf("\n");
-	}*/
